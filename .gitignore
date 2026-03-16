@@ -1,0 +1,13 @@
+# XFOIL temporary results
+results_*.txt
+
+# Compiled Python
+__pycache__/
+*.pyc
+
+# XFOIL executable
+xfoil.exe
+
+# OS files
+.DS_Store
+Thumbs.db
