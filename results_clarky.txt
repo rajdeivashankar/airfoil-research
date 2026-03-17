@@ -1,7 +1,7 @@
   
        XFOIL         Version 6.99
   
- Calculated polar for: CLARK Y AIRFOIL                                 
+ Calculated polar for: AIRFOIL                                         
   
  1 1 Reynolds number fixed          Mach number fixed         
   

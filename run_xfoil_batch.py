@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
+import glob
 
 def convert_lednicer_to_selig(filepath):
     """Convert Lednicer format .dat file to Selig format XFOIL can read"""
@@ -22,13 +23,11 @@ def convert_lednicer_to_selig(filepath):
             try:
                 x = float(parts[0])
                 y = float(parts[1])
-                # Point count line like "61.0  61.0"
                 if x > 1.5:
                     current = 'upper'
                     continue
                 if current == 'upper':
                     upper.append((x, y))
-                    # Switch to lower after first surface ends at x=1
                     if x == 1.0 and len(upper) > 1:
                         current = 'lower'
                 elif current == 'lower':
@@ -36,33 +35,38 @@ def convert_lednicer_to_selig(filepath):
             except ValueError:
                 continue
     
-    # Selig format: upper surface leading edge to trailing edge reversed
-    # then lower surface trailing edge to leading edge
-    coords = list(reversed(upper)) + lower[1:]  # skip duplicate leading edge
-    
-    # Write converted file
+    coords = list(reversed(upper)) + lower[1:]
     out_path = filepath.replace('.dat', '_converted.dat')
     with open(out_path, 'w') as f:
-        f.write('CLARK Y AIRFOIL\n')
+        f.write('AIRFOIL\n')
         for x, y in coords:
             f.write(f'  {x:.7f}  {y:.7f}\n')
-    
     return out_path
-# Then change the Clark Y entry in your airfoils dictionary to convert it on the fly:
-pythonairfoils = {
-    'naca2412': 'data/naca2412.dat',
-    'naca4412': 'data/naca4412.dat',
-    'clarky':   convert_lednicer_to_selig('data/clarky.dat'),
-    'e387':     'data/e387.dat',
-    's1223':    'data/s1223.dat',
-}
+
+def detect_format(filepath):
+    """Detect if file is Lednicer format and convert if needed"""
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) == 2:
+            try:
+                x = float(parts[0])
+                y = float(parts[1])
+                if x > 1.5:
+                    return convert_lednicer_to_selig(filepath)
+            except ValueError:
+                continue
+    return filepath
 
 def run_xfoil(airfoil_name, airfoil_file, reynolds, alpha_start, alpha_end, alpha_step):
     """Run XFOIL simulation and return results as a DataFrame"""
     
     output_file = f'results_{airfoil_name}.txt'
     
-    # Delete old results file if it exists
     if os.path.exists(output_file):
         os.remove(output_file)
     
@@ -83,15 +87,18 @@ def run_xfoil(airfoil_name, airfoil_file, reynolds, alpha_start, alpha_end, alph
         f"QUIT\n"
     )
     
-    subprocess.run(
-        ['xfoil.exe'],
-        input=commands,
-        capture_output=True,
-        text=True,
-        timeout=180
-    )
+    try:
+        subprocess.run(
+            ['xfoil.exe'],
+            input=commands,
+            capture_output=True,
+            text=True,
+            timeout=60  # reduced from 180 — if it takes longer than 60s, skip it
+        )
+    except subprocess.TimeoutExpired:
+        print(f"  Timeout — skipping {airfoil_name}")
+        return None
     
-    # Parse results file
     if not os.path.exists(output_file):
         print(f"  Warning: No results for {airfoil_name}")
         return None
@@ -125,7 +132,6 @@ def extract_metrics(df, airfoil_name):
     if df is None or len(df) < 3:
         return None
     
-    # Find stall angle (where CL starts dropping)
     max_cl_idx = df['CL'].idxmax()
     
     metrics = {
@@ -139,34 +145,70 @@ def extract_metrics(df, airfoil_name):
     }
     return metrics
 
-# Define airfoils to simulate
-airfoils = {
-    'naca2412': ('data/naca2412.dat', -5, 15),
-    'naca4412': ('data/naca4412.dat', -5, 15),
-    'clarky':   (convert_lednicer_to_selig('data/clarky.dat'), -5, 15),
-    'e387':     ('data/e387.dat', 0, 12),
-    's1223':    ('data/s1223.dat', 0, 12),
-}
+def clean_results(df):
+    """Remove physically unrealistic data points"""
+    if df is None:
+        return None
+    
+    # Remove points where CD is unrealistically small
+    df = df[df['CD'] > 0.008]
+    
+    # Remove points where CL/CD is unrealistically high
+    df = df[df['CL_CD'].abs() < 150]
+
+    # Remove statistical outliers in CD
+    median_cd = df['CD'].median()
+    df = df[df['CD'] > median_cd * 0.3]
+    
+    # Remove duplicate alpha values
+    df = df.drop_duplicates(subset='alpha', keep='last')
+    
+    # Must have data covering alpha=0 to alpha=5 for UAV relevance
+    has_low_alpha = df['alpha'].min() <= 1.0
+    has_mid_alpha = df['alpha'].max() >= 5.0
+    if not (has_low_alpha and has_mid_alpha):
+        return None
+    
+    # Must have at least 5 valid points
+    if len(df) < 5:
+        return None
+    
+    return df.reset_index(drop=True)
+
+# Auto-detect all airfoil files in data folder
+dat_files = glob.glob('data/*.dat')
+dat_files = [f for f in dat_files if 'converted' not in f]
 
 reynolds = 200000
 all_results = []
 all_metrics = []
 
-print("Running batch XFOIL simulations...")
-print(f"Airfoils: {len(airfoils)} | Reynolds: {reynolds:,}\n")
+print(f"Found {len(dat_files)} airfoil files")
+print(f"Reynolds number: {reynolds:,}\n")
 
-for name, (filepath, alpha_start, alpha_end) in airfoils.items():
+for filepath in sorted(dat_files):
+    name = os.path.basename(filepath).replace('.dat', '')
     print(f"Simulating {name}...")
     
+    actual_filepath = detect_format(filepath)
+    
+    # Skip known problematic airfoils
+    if name in ['mh114', 'ag14', 'ag13']:
+        print(f"  Skipping {name} (known convergence issues)")
+        continue
+
     df = run_xfoil(
         airfoil_name=name,
-        airfoil_file=filepath,
+        airfoil_file=actual_filepath,
         reynolds=reynolds,
-        alpha_start=alpha_start,
-        alpha_end=alpha_end,
+        alpha_start=-5,
+        alpha_end=15,
         alpha_step=1
     )
-    
+
+    if df is not None:
+        df = clean_results(df)
+
     if df is not None:
         all_results.append(df)
         metrics = extract_metrics(df, name)
@@ -174,50 +216,20 @@ for name, (filepath, alpha_start, alpha_end) in airfoils.items():
             all_metrics.append(metrics)
         print(f"  Done — {len(df)} points, max CL/CD = {df['CL_CD'].max():.1f}")
     
-    time.sleep(0.5)  # small pause between runs
+    time.sleep(0.3)
 
-# Combine all results
-combined_df = pd.concat(all_results, ignore_index=True)
-metrics_df = pd.DataFrame(all_metrics)
-
-# Save to CSV
-os.makedirs('results', exist_ok=True)
-combined_df.to_csv('results/simulation_results.csv', index=False)
-metrics_df.to_csv('results/airfoil_metrics.csv', index=False)
-
-print(f"\nAll simulations complete!")
-print(f"Total data points: {len(combined_df)}")
-print(f"\nPerformance Summary:")
-print(metrics_df.to_string(index=False))
-
-# Plot lift curves for all airfoils
-fig, axes = plt.subplots(1, 3, figsize=(16, 5))
-colors = ['blue', 'red', 'green', 'orange', 'purple']
-
-for (name, group), color in zip(combined_df.groupby('airfoil'), colors):
-    axes[0].plot(group['alpha'], group['CL'], '-o', color=color, markersize=3, label=name)
-    axes[1].plot(group['CD'], group['CL'], '-o', color=color, markersize=3, label=name)
-    axes[2].plot(group['alpha'], group['CL_CD'], '-o', color=color, markersize=3, label=name)
-
-axes[0].set_title('Lift Curves')
-axes[0].set_xlabel('Angle of Attack (deg)')
-axes[0].set_ylabel('CL')
-axes[0].legend(fontsize=8)
-axes[0].grid(True, alpha=0.3)
-
-axes[1].set_title('Drag Polars')
-axes[1].set_xlabel('CD')
-axes[1].set_ylabel('CL')
-axes[1].legend(fontsize=8)
-axes[1].grid(True, alpha=0.3)
-
-axes[2].set_title('Lift-to-Drag Ratios')
-axes[2].set_xlabel('Angle of Attack (deg)')
-axes[2].set_ylabel('CL/CD')
-axes[2].legend(fontsize=8)
-axes[2].grid(True, alpha=0.3)
-
-plt.suptitle(f'Airfoil Performance Comparison (Re={reynolds:,})', fontweight='bold')
-plt.tight_layout()
-plt.savefig('results/comparison_plots.png', dpi=150)
-plt.show()
+if all_results:
+    combined_df = pd.concat(all_results, ignore_index=True)
+    metrics_df = pd.DataFrame(all_metrics)
+    
+    os.makedirs('results', exist_ok=True)
+    combined_df.to_csv('results/simulation_results.csv', index=False)
+    metrics_df.to_csv('results/airfoil_metrics.csv', index=False)
+    
+    print(f"\nAll simulations complete!")
+    print(f"Successful: {len(all_metrics)}/{len(dat_files)} airfoils")
+    print(f"Total data points: {len(combined_df)}")
+    print(f"\nTop 10 by CL/CD:")
+    print(metrics_df.sort_values('max_CL_CD', ascending=False).head(10).to_string(index=False))
+else:
+    print("No results generated")
