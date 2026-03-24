@@ -65,7 +65,7 @@ def detect_format(filepath):
 def run_xfoil(airfoil_name, airfoil_file, reynolds, alpha_start, alpha_end, alpha_step):
     """Run XFOIL simulation and return results as a DataFrame"""
     
-    output_file = f'results_{airfoil_name}.txt'
+    output_file = f'results/raw/results_{airfoil_name}.txt'
     
     if os.path.exists(output_file):
         os.remove(output_file)

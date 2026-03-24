@@ -51,7 +51,7 @@ for ax, (name, filepath), color in zip(axes, airfoils.items(), colors):
     ax.set_title(f'{name}')
     ax.set_xlabel('x/c')
     ax.set_ylabel('y/c')
-    ## ax.axis('equal')
+    ax.axis('equal')
     ax.grid(True, alpha=0.3)
 
 plt.suptitle('Airfoil Geometry Comparison', fontsize=14, fontweight='bold', y=1.01)

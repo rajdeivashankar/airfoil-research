@@ -1,5 +1,5 @@
 # XFOIL temporary results
-results_*.txt
+results/raw/
 
 # Compiled Python
 __pycache__/
