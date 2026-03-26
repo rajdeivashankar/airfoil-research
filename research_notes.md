@@ -14,7 +14,7 @@ leading to inaccurate preconceptions about the geometry-performance relationship
 
 ### Topic: load_airfoil function — how file parsing works
 
-**What the function does** The function filters through the raw coordinate file and adds each x and y coordinate to a list.The raw files are not clean data and this helps filter the data into something usable.
+**What the function does:** The function filters through the raw coordinate file and adds each x and y coordinate to a list.The raw files are not clean data and this helps filter the data into something usable.
 
 **The four reasons a line gets skipped:** 1 - If the line is empty, caught by if not line: | 2 - If the line doesn't have exactly 2 parts, caught by in len(parts) == 2 | 3 - If either of the two parts are too large, caught by if x > 1.5 or y > 1.5 | 4 - If the 2 parts can't be converted into numbers, caught by xcept ValueError
 
@@ -29,3 +29,37 @@ leading to inaccurate preconceptions about the geometry-performance relationship
 **What the conversion does step by step:** The conversion takes each line of the data, determines if it is part of the upper or lower dataset, appends the coordinates to the correct list, then flips the order of the upper coordinates and appends the list of the lower coordinates to get a list of coordinates in a continuous loop.
 
 **Why the leading edge duplicate matters:** Since the upper and lower datasets start at x = 0 in Lednicer, there is a duplicated point at the leading edge which affects the continuity of the loop. To resolve this the lower list bypasses the first valid coordinates on the lower dataset which corresponds to the repeated point.
+
+## March 25, 2026
+
+### Topic: Reynolds number research
+
+**What is Reynolds number physically?**
+
+The Reynolds number is a dimensionless quantity that compares **inertial forces** to **viscous forces** in a fluid flow. Inertial forces are related to the motion of the fluid (how much it resists changes in velocity), while viscous forces come from the fluid’s internal friction or “stickiness.”
+Physically, this ratio tells us which effect dominates the flow:
+- High Reynolds number → inertia dominates → flow tends to be turbulent  
+- Low Reynolds number → viscosity dominates → flow is smoother and more laminar  
+So, Reynolds number essentially describes the *behavior* or structure of the flow around an object.
+
+**2. Why do small UAVs operate at low Reynolds numbers?**
+
+Small UAVs operate at low Reynolds numbers mainly because of their **small size and relatively low speeds**. The Reynolds number depends on velocity and a characteristic length (like wing chord), so when the vehicle is small, the length scale is small, which lowers the Reynolds number.
+
+At these low Reynolds numbers:
+- Viscous effects become much more important  
+- Boundary layers are thicker and more influential  
+- Flow is more likely to stay laminar and separate earlier  
+
+This means small UAV aerodynamics are dominated by viscosity, unlike large aircraft where inertial forces dominate.
+
+## 3. How does this connect to why I chose Re = 200,000 for our simulations?
+
+I simulated at Re=200,000 as a starting point representing typical small UAV cruise conditions because it falls within the typical low Reynolds number regime that small UAVs operate in. NASA explains that matching Reynolds number between experiments and real-world conditions is critical to correctly capturing the balance between inertial and viscous forces.
+
+By simulating at Re = 200,000:
+- We replicate the correct physics of the flow (especially viscous effects)
+- We ensure the boundary layer behavior and drag characteristics are realistic
+- Our results better represent actual UAV flight conditions  
+
+If I used a much higher Reynolds number, I would incorrectly model the flow as more inertia-dominated, leading to inaccurate predictions of lift, drag, and flow separation.
