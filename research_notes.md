@@ -40,9 +40,9 @@ The Reynolds number is a dimensionless quantity that compares **inertial forces*
 Physically, this ratio tells us which effect dominates the flow:
 - High Reynolds number → inertia dominates → flow tends to be turbulent  
 - Low Reynolds number → viscosity dominates → flow is smoother and more laminar  
-So, Reynolds number essentially describes the *behavior* or structure of the flow around an object.
+So, Reynolds number essentially describes the behavior or structure of the flow around an object.
 
-**2. Why do small UAVs operate at low Reynolds numbers?**
+**Why do small UAVs operate at low Reynolds numbers?**
 
 Small UAVs operate at low Reynolds numbers mainly because of their **small size and relatively low speeds**. The Reynolds number depends on velocity and a characteristic length (like wing chord), so when the vehicle is small, the length scale is small, which lowers the Reynolds number.
 
@@ -53,7 +53,7 @@ At these low Reynolds numbers:
 
 This means small UAV aerodynamics are dominated by viscosity, unlike large aircraft where inertial forces dominate.
 
-## 3. How does this connect to why I chose Re = 200,000 for our simulations?
+**How does this connect to why I chose Re = 200,000 for our simulations?**
 
 I simulated at Re=200,000 as a starting point representing typical small UAV cruise conditions because it falls within the typical low Reynolds number regime that small UAVs operate in. NASA explains that matching Reynolds number between experiments and real-world conditions is critical to correctly capturing the balance between inertial and viscous forces.
 
