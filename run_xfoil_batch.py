@@ -71,20 +71,20 @@ def run_xfoil(airfoil_name, airfoil_file, reynolds, alpha_start, alpha_end, alph
         os.remove(output_file)
     
     commands = (
-        f"LOAD {airfoil_file}\n"
-        f"PANE\n"
-        f"OPER\n"
-        f"VISC\n"
-        f"{reynolds}\n"
-        f"ITER\n"
-        f"200\n"
-        f"PACC\n"
+        f"LOAD {airfoil_file}\n"                            #Loads coordinate file
+        f"PANE\n"                                           #Organizes data points into panels
+        f"OPER\n"                                           #Opens operating menu
+        f"VISC\n"                                           #Turns on viscous analysis
+        f"{reynolds}\n"                                     #Sets up Reynolds regime
+        f"ITER\n"                                           #Sets maximum number of iterations
+        f"200\n"                                            #200 iterations maximum
+        f"PACC\n"                                           #Begins saving results to output_file
         f"{output_file}\n"
+        f"\n"                                               #Blank line confirms PACC filename prompt
+        f"ASEQ {alpha_start} {alpha_end} {alpha_step}\n"    #Sets the start angle of attack, end angle of attack, and step
+        f"PACC\n"                                           #Ends saving results to output_file
         f"\n"
-        f"ASEQ {alpha_start} {alpha_end} {alpha_step}\n"
-        f"PACC\n"
-        f"\n"
-        f"QUIT\n"
+        f"QUIT\n"                                           #Exits XFOIL analysis
     )
     
     try:
