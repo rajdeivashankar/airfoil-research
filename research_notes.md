@@ -63,3 +63,24 @@ By simulating at Re = 200,000:
 - Our results better represent actual UAV flight conditions  
 
 If I used a much higher Reynolds number, I would incorrectly model the flow as more inertia-dominated, leading to inaccurate predictions of lift, drag, and flow separation.
+
+## March 26, 2026
+
+### Topic: XFOIL commands and what they do
+
+**What each command does:**
+- LOAD: Loads the airfoil coordinate file into XFOIL
+- PANE: Splits the coordinate file into panels and organizes the data
+- OPER: Enters the operating meny in XFOIL
+- VISC: Enables viscous analysis
+- {reynolds}: Sets up the Reynolds number
+- ITER: Sets the maximum amount of iterations
+- PACC: Turns on/off polar accumulation that saves results in a results file
+- ASEQ: Sets the range and step of angles of attack that should be tested
+- QUIT: Ends the XFOIL analysis
+
+**Why viscous analysis matters at low Reynolds numbers:**
+Low Reynolds numbers have a high ratio of viscous forces to inertial forces, increasing the need of viscous analysis to get accurate results. Viscous mode activates XFOIL's boundary layer model which accounts for skin friction drag and flow separation.
+
+**What would happen if we forgot PACC:**
+The results of the XFOIL simulation would not save to a file resulting in an empty dataset since the data frame is built on that results file.
