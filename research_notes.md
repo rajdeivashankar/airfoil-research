@@ -115,7 +115,7 @@ So overall:
 - Camber location = 0.4c  
 - Thickness = 0.12c
 
-## Connection to extract_geometry.py
+### Connection to extract_geometry.py
 
 The NACA 4-digit system defines airfoil geometry analytically, while `extract_geometry.py` reconstructs those same parameters numerically from coordinate data. The script separates upper and lower surfaces, interpolates them onto a normalized chord grid (x/c), and computes geometric features.
 
