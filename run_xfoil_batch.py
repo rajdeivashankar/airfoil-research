@@ -132,18 +132,18 @@ def extract_metrics(df, airfoil_name):
     if df is None or len(df) < 3:
         return None
     
-    max_cl_idx = df['CL'].idxmax()
+    max_cl_idx = df['CL'].idxmax()                                                                  #Stores the index of the maximum CL value
     
     metrics = {
-        'airfoil': airfoil_name,
-        'max_CL': df['CL'].max(),
-        'stall_angle': df.loc[max_cl_idx, 'alpha'],
-        'min_CD': df['CD'].min(),
-        'max_CL_CD': df['CL_CD'].max(),
-        'best_alpha': df.loc[df['CL_CD'].idxmax(), 'alpha'],
-        'CL_at_0': df.loc[df['alpha'].abs().idxmin(), 'CL'] if 0 in df['alpha'].values else None,
+        'airfoil': airfoil_name,                                                                    #Stores the airfoil name
+        'max_CL': df['CL'].max(),                                                                   #Stores the maximum CL value
+        'stall_angle': df.loc[max_cl_idx, 'alpha'],                                                 #Finds and stores the stall angle from the maximum CL value
+        'min_CD': df['CD'].min(),                                                                   #Stores the minimum CD value
+        'max_CL_CD': df['CL_CD'].max(),                                                             #Stores the maximum CL/CD value
+        'best_alpha': df.loc[df['CL_CD'].idxmax(), 'alpha'],                                        #Stores the angle of attack at the maximum CL/CD value
+        'CL_at_0': df.loc[df['alpha'].abs().idxmin(), 'CL'] if 0 in df['alpha'].values else None,   #Stores CL at 0 as the CL at the closest valid angle of attack to 0
     }
-    return metrics
+    return metrics                                                                                  #Returns all metrics
 
 def clean_results(df):
     """Remove physically unrealistic data points"""
