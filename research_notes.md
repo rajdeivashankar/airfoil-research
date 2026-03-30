@@ -124,3 +124,21 @@ The camber line is calculated as the average of the upper and lower surfaces, an
 Additional parameters like `max_thickness_loc`, `le_thickness`, and `te_thickness` extend beyond the NACA definition and provide more detailed shape characterization. Metrics such as `camber_at_25` and `camber_area` help quantify how camber is distributed along the chord.
 
 This connection allows validation that coordinate files match their NACA labels and ensures accurate geometry is used in simulations. Ultimately, the script bridges theoretical airfoil definitions and real data, allowing direct comparison between geometry and aerodynamic performance.
+
+## March 29, 2026
+### Topic: extract_metrics function — performance metrics and defensive programming
+
+**What the function does overall:**
+The function takes the raw data from the simulation and converts it into usable metrics that can be analyzed by the model.
+
+**What idxmax() returns and how we use it to find stall angle:**
+The function idxmax() returns the index of where the CL is the highest across the distribution along the airfoil. This is used to find the stall angle since lift rises until it drops sharply as you increase the angle of attack, so the point where the CL is the highest is where the alpha value is the stall angle.
+
+**What CL_at_0 tells us physically:**
+CL at 0 tells us how much lift an airfoil would generate with an angle of attack of 0 degrees. A symmetric airfoil has 0 camber and therefore generates no lift at an angle of attack of 0 degrees, while a cambered airfoil would generate some lift due to its shape. This value is a direct indicator of camber magnitude.
+
+**Why abs().idxmin() instead of direct alpha=0 lookup:**
+If XFOIL skips alpha=0 during a run, abs().idxmin() finds the angle of attack closest to zero and uses that CL value as an estimate instead of leaving an empty gap in the dataset.
+
+**Why incomplete data matters for this research:**
+Incomplete data matters for this research since different airfoils are not comparable to each other with the model if there is empty points in the datasets. With a dataset of 67 airfoils every dataset that isn't full decreases the accuracy of the model.
