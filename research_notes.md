@@ -142,3 +142,12 @@ If XFOIL skips alpha=0 during a run, abs().idxmin() finds the angle of attack cl
 
 **Why incomplete data matters for this research:**
 Incomplete data matters for this research since different airfoils are not comparable to each other with the model if there is empty points in the datasets. With a dataset of 67 airfoils every dataset that isn't full decreases the accuracy of the model.
+
+## March 30, 2926
+### Lift-to-Drag Ratio (L/D) and UAV Efficiency
+
+Lift-to-drag ratio (L/D) measures how much useful lift an airfoil or wing generates compared to the drag it produces. Physically, it represents aerodynamic efficiency. A higher L/D means the aircraft can produce the same lift with less energy lost to air resistance.
+
+For UAVs, L/D is more important than maximum lift alone because efficiency—not just force generation—determines performance. A design with very high lift but also high drag will require more power, reducing flight time and range. In contrast, a high L/D airfoil allows the UAV to sustain flight with less energy, improving endurance and overall efficiency.
+
+This is why metrics like maximum CL/CD (a proxy for L/D) are used in analysis. They directly reflect how effectively an airfoil converts aerodynamic forces into useful flight performance.
