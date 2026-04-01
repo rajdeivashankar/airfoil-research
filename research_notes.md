@@ -156,9 +156,11 @@ This is why metrics like maximum CL/CD (a proxy for L/D) are used in analysis. T
 ### Boundary Layer Separation — Research Notes
 
 **What is boundary layer separation physically?**
+
 Boundary layer separation occurs when the airflow near a surface loses enough energy that it can no longer stay attached. As the flow moves into a region of increasing pressure (adverse pressure gradient), it slows down, stops, and can even reverse direction. This causes the flow to detach from the surface, forming a turbulent wake and reducing lift while increasing drag.
 
 **What conditions affect when separation occurs?**
+
 Earlier separation:
 - High angle of attack  
 - Low Reynolds number  
@@ -172,5 +174,6 @@ Later separation:
 - Added energy to the flow (e.g., roughness or control methods)
 
 **Why does XFOIL lose convergence near stall?**
+
 XFOIL assumes mostly attached flow. Near stall, separation becomes large and unstable, with reversed and chaotic flow. This violates XFOIL’s assumptions, causing the numerical solution to break down and fail to converge.
 
