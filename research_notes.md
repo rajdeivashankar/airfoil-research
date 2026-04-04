@@ -153,7 +153,7 @@ For UAVs, L/D is more important than maximum lift alone because efficiency—not
 This is why metrics like maximum CL/CD (a proxy for L/D) are used in analysis. They directly reflect how effectively an airfoil converts aerodynamic forces into useful flight performance.
 
 ## March 31, 2026
-### Boundary Layer Separation — Research Notes
+### Topic: Boundary Layer Separation and Connections to XFOIL Convergence Loss
 
 **What is boundary layer separation physically?**
 
@@ -176,4 +176,41 @@ Later separation:
 **Why does XFOIL lose convergence near stall?**
 
 XFOIL assumes mostly attached flow. Near stall, separation becomes large and unstable, with reversed and chaotic flow. This violates XFOIL’s assumptions, causing the numerical solution to break down and fail to converge.
+
+## April 1, 2026
+### Topic: `clean_results()` — data cleaning rationale and convergence artifact identification
+
+**What `CD < 0.008` is catching:**
+When XFOIL's iteration loop hasn't converged for a given angle of attack, the boundary layer calculation never settles on a physical solution, so drag components don't add up correctly and CD comes out near zero or negative. Real airfoils always have some drag. Any value below 0.008 is a convergence artifact, not a real aerodynamic result.
+
+**Why `|CL/CD| > 150` is the second filter:**
+A near-zero CD in the denominator causes the ratio to explode toward infinity regardless of CL. Real airfoils at low Reynolds numbers top out around CL/CD of 100-120 in ideal conditions — the best airfoil in the dataset, E216, came in at 99.2. Anything above 150 is a math artifact from a bad CD value, not a high-performing airfoil. The two filters work together: CD < 0.008 catches the most obvious garbage values, CL/CD > 150 catches anything that slips through with slightly less extreme but still unrealistic drag.
+
+**Why duplicate alpha values exist and why we keep the last:**
+Duplicates occur when the batch loop picks up both the original Lednicer file and the converted Selig file for the same airfoil, simulating it twice at the same angles of attack. We keep the last result because it came from the correctly formatted converted file that XFOIL can handle properly.
+
+## April 2, 2026
+
+## April 3, 2026
+### Topic: `extract_geometry.py` — surface separation, interpolation, and geometry calculations
+
+**What `le_idx = np.argmin(coords[:, 0])` does:**
+Finds the index of the point with the minimum x value. Since airfoil coordinates are normalized so x=0 is the leading edge and x=1 is the trailing edge, the minimum x point is the leading edge. This becomes the split point between upper and lower surfaces — the one point both surfaces share.
+
+**Why interpolation onto a common x grid is necessary:**
+Raw coordinates can't be used directly for three reasons:
+- Mismatched x positions — upper and lower surfaces don't have points at the same x locations
+- Unequal point counts — numpy can't subtract arrays of different lengths
+- Uneven spacing — raw files cluster points near the leading edge
+
+Interpolating both surfaces onto 100 evenly spaced points from x=0.01 to x=0.99 resolves all three problems.
+
+**Camber line: `camber_line = (y_upper + y_lower) / 2`**
+The camber line is the locus of midpoints between upper and lower surfaces at every x. A symmetric airfoil has `y_upper = -y_lower` everywhere, so the camber line = 0, which is why symmetric airfoils produce `CL_at_0 = 0`.
+
+**Thickness: `thickness = y_upper - y_lower`**
+The full gap between upper and lower surfaces at each x. Subtraction gives the gap; averaging would give the midpoint (camber). Same two numbers, different operations, completely different geometric properties.
+
+**Connection to NACA nomenclature:**
+These formulas reconstruct the same parameters encoded in NACA 4-digit names. For NACA 2412: `max_camber=0.02`, `max_camber_loc=0.4`, `max_thickness=0.12` should match digits 2, 4, 12. This lets us validate the geometry extraction is working correctly.
 
