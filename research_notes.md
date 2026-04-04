@@ -16,7 +16,11 @@ leading to inaccurate preconceptions about the geometry-performance relationship
 
 **What the function does:** The function filters through the raw coordinate file and adds each x and y coordinate to a list.The raw files are not clean data and this helps filter the data into something usable.
 
-**The four reasons a line gets skipped:** 1 - If the line is empty, caught by if not line: | 2 - If the line doesn't have exactly 2 parts, caught by in len(parts) == 2 | 3 - If either of the two parts are too large, caught by if x > 1.5 or y > 1.5 | 4 - If the 2 parts can't be converted into numbers, caught by xcept ValueError
+**The four reasons a line gets skipped:** 
+  1 - If the line is empty, caught by if not line:
+  2 - If the line doesn't have exactly 2 parts, caught by in len(parts) == 2
+  3 - If either of the two parts are too large, caught by if x > 1.5 or y > 1.5
+  4 - If the 2 parts can't be converted into numbers, caught by xcept ValueError
 
 **Why this matters for the project:** If one of the checks was missing it would lead to the airfoil being plotted incorrectly. For example, the Clark Y file has a slightly different format that would cause one coordinate to be plotted at (61.0, 61.0), which would severely affect the plots and XFOIL analysis.
 
@@ -131,14 +135,14 @@ This connection allows validation that coordinate files match their NACA labels 
 **What the function does overall:**
 The function takes the raw data from the simulation and converts it into usable metrics that can be analyzed by the model.
 
-**What idxmax() returns and how we use it to find stall angle:**
-The function idxmax() returns the index of where the CL is the highest across the distribution along the airfoil. This is used to find the stall angle since lift rises until it drops sharply as you increase the angle of attack, so the point where the CL is the highest is where the alpha value is the stall angle.
+**What `idxmax()` returns and how we use it to find stall angle:**
+The function `idxmax()` returns the index of where the CL is the highest across the distribution along the airfoil. This is used to find the stall angle since lift rises until it drops sharply as you increase the angle of attack, so the point where the CL is the highest is where the alpha value is the stall angle.
 
-**What CL_at_0 tells us physically:**
+**What `CL_at_0` tells us physically:**
 CL at 0 tells us how much lift an airfoil would generate with an angle of attack of 0 degrees. A symmetric airfoil has 0 camber and therefore generates no lift at an angle of attack of 0 degrees, while a cambered airfoil would generate some lift due to its shape. This value is a direct indicator of camber magnitude.
 
-**Why abs().idxmin() instead of direct alpha=0 lookup:**
-If XFOIL skips alpha=0 during a run, abs().idxmin() finds the angle of attack closest to zero and uses that CL value as an estimate instead of leaving an empty gap in the dataset.
+**Why `abs().idxmin()` instead of direct alpha=0 lookup:**
+If XFOIL skips alpha=0 during a run, `abs().idxmin()` finds the angle of attack closest to zero and uses that CL value as an estimate instead of leaving an empty gap in the dataset.
 
 **Why incomplete data matters for this research:**
 Incomplete data matters for this research since different airfoils are not comparable to each other with the model if there is empty points in the datasets. With a dataset of 67 airfoils every dataset that isn't full decreases the accuracy of the model.
