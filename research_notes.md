@@ -190,6 +190,19 @@ A near-zero CD in the denominator causes the ratio to explode toward infinity re
 Duplicates occur when the batch loop picks up both the original Lednicer file and the converted Selig file for the same airfoil, simulating it twice at the same angles of attack. We keep the last result because it came from the correctly formatted converted file that XFOIL can handle properly.
 
 ## April 2, 2026
+### Topic: Camber Line and Connection to Lift
+
+**What does the camber line represent physically?**
+
+The camber line is the curve halfway between the upper and lower surfaces of an airfoil. Physically, it represents the airfoil’s overall curvature and how “bent” the shape is. A symmetric airfoil has a flat camber line, while a cambered airfoil has a curved one.
+
+**How does camber generate lift?** 
+
+Camber changes how air flows over the airfoil. On a cambered airfoil, the upper surface accelerates the flow more and lowers pressure, while the lower surface maintains relatively higher pressure. It also deflects air downward more effectively, contributing to lift through both pressure difference and momentum change. Compared to a symmetric airfoil, a cambered one produces lift even at zero angle of attack.
+
+**Why does more camber mean more lift at low angles of attack?**
+
+More camber increases the airfoil’s curvature, which strengthens the pressure difference between the upper and lower surfaces. This allows the airfoil to generate higher lift even at small angles of attack, effectively shifting the lift curve upward and increasing lift at low speeds.
 
 ## April 3, 2026
 ### Topic: `extract_geometry.py` — surface separation, interpolation, and geometry calculations
