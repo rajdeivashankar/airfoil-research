@@ -241,3 +241,35 @@ Maximum camber measures the single greatest distance between the camber line and
 
 Camber area, computed as the integral of the absolute camber line, captures the total amount of camber present across the entire airfoil. It acts as a measure of overall curvature rather than just the peak value. As a result, camber area may correlate more strongly with aerodynamic performance metrics because it reflects both the magnitude and distribution of camber, whereas maximum camber only reflects the largest local deviation.
 
+## June 19, 2026
+## Topic: Correlation matrix interpretation and binning analysis in `analyze_geometry.py`
+
+**Why thickness correlates weakly with CL/CD but strongly with min_CD:**
+Thickness has a direct, strong physical effect on drag — more surface area and a blunter profile increase skin friction drag and pressure drag, which is why `max_thickness` correlates strongly with `min_CD`. But thickness has only a weak, indirect effect on lift. Camber is what actually generates lift, by changing how flow accelerates over the top surface versus the bottom. Since `max_CL/CD` is a ratio dominated by the lift side for well-designed airfoils, and thickness barely moves the lift side, thickness ends up looking almost irrelevant to CL/CD (R=0.060) even though it clearly matters for drag alone.
+
+**What `pd.cut()` does and why binning reveals more than a single correlation number:**
+`pd.cut()` takes a continuous numeric column (e.g. `max_camber`) and slices it into discrete ranges like "0-2%", "2-4%", etc. Every airfoil is assigned to one bin based on its value, and we can compute the mean CL/CD within each bin.
+
+A correlation coefficient like R=0.723 (max_camber vs max_CL/CD) assumes a linear relationship — it measures how well a straight line fits the data. The camber bin results show a parabola instead:
+
+- 0-2%: mean CL/CD = 61.6
+- 2-4%: mean CL/CD = 73.9
+- 4-6%: mean CL/CD = 82.3 (peak)
+- 6-8%: mean CL/CD = 81.7
+- 8-12%: mean CL/CD = 79.5
+
+A single R value can never capture "there's an optimal middle range, and too much or too little both hurt performance" — that non-linear shape only shows up when you bin the data and look at the pattern directly.
+
+**Why 4-6% camber is the optimal range:**
+Below 4%, the airfoil isn't generating enough lift to be efficient. Above 6%, the additional camber starts adding drag (more curvature, more flow acceleration, more pressure drag) faster than it adds useful lift. The 4-6% range balances lift generation against the drag penalty of excess curvature.
+
+**Why thickness also shows a parabolic relationship:**
+- <8%: mean CL/CD = 57.75
+- 8-10%: mean CL/CD = 67.03
+- 10-12%: mean CL/CD = 73.07
+- 12-15%: mean CL/CD = 73.75 (peak)
+- >15%: mean CL/CD = 67.10
+
+The high end (>15%) underperforms because thickness mainly adds skin friction and pressure drag without helping lift. The low end (<8%) underperforms for a different reason: very thin airfoils at low Reynolds numbers are prone to laminar separation bubbles and abrupt stall. At low Re the boundary layer is naturally thick and laminar, and a very thin airfoil doesn't have enough surface curvature to keep flow attached around the leading edge. The flow separates early, adding its own drag penalty and risking premature stall. So thin airfoils don't just fail to gain extra lift — they actively lose efficiency from separation. 12-15% is the sweet spot where neither the high-thickness drag problem nor the low-thickness separation problem dominates.
+
+**Follow-up reading:** laminar separation bubbles at low Reynolds numbers — connects directly to earlier boundary layer separation notes and should strengthen the discussion section of the paper.
