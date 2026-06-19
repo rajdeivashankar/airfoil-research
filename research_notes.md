@@ -235,3 +235,9 @@ The full gap between upper and lower surfaces at each x. Subtraction gives the g
 **Connection to NACA nomenclature:**
 These formulas reconstruct the same parameters encoded in NACA 4-digit names. For NACA 2412: `max_camber=0.02`, `max_camber_loc=0.4`, `max_thickness=0.12` should match digits 2, 4, 12. This lets us validate the geometry extraction is working correctly.
 
+## Camber Area vs. Maximum Camber
+
+Maximum camber measures the single greatest distance between the camber line and the chord line, capturing the peak curvature of an airfoil. However, it does not describe how that curvature is distributed along the chord. Two airfoils can have the same maximum camber but very different overall shapes if one remains cambered over a larger portion of the chord.
+
+Camber area, computed as the integral of the absolute camber line, captures the total amount of camber present across the entire airfoil. It acts as a measure of overall curvature rather than just the peak value. As a result, camber area may correlate more strongly with aerodynamic performance metrics because it reflects both the magnitude and distribution of camber, whereas maximum camber only reflects the largest local deviation.
+
