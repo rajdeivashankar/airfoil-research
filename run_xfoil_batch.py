@@ -65,7 +65,7 @@ def detect_format(filepath):
 def run_xfoil(airfoil_name, airfoil_file, reynolds, alpha_start, alpha_end, alpha_step):
     """Run XFOIL simulation and return results as a DataFrame"""
     
-    output_file = f'results/raw/results_{airfoil_name}.txt'
+    output_file = f'results/raw/results_{airfoil_name}_Re{reynolds}.txt'
     
     if os.path.exists(output_file):
         os.remove(output_file)
@@ -93,7 +93,7 @@ def run_xfoil(airfoil_name, airfoil_file, reynolds, alpha_start, alpha_end, alph
             input=commands,
             capture_output=True,
             text=True,
-            timeout=60  # reduced from 180 — if it takes longer than 60s, skip it
+            timeout=120  # reduced from 180 — if it takes longer than 120s, skip it
         )
     except subprocess.TimeoutExpired:
         print(f"  Timeout — skipping {airfoil_name}")
@@ -136,12 +136,13 @@ def extract_metrics(df, airfoil_name):
     
     metrics = {
         'airfoil': airfoil_name,                                                                    #Stores the airfoil name
+        'reynolds': df['reynolds'].iloc[0],                                                         #Tags each metrics row with its Reynolds number
         'max_CL': df['CL'].max(),                                                                   #Stores the maximum CL value
         'stall_angle': df.loc[max_cl_idx, 'alpha'],                                                 #Finds and stores the stall angle from the maximum CL value
         'min_CD': df['CD'].min(),                                                                   #Stores the minimum CD value
         'max_CL_CD': df['CL_CD'].max(),                                                             #Stores the maximum CL/CD value
         'best_alpha': df.loc[df['CL_CD'].idxmax(), 'alpha'],                                        #Stores the angle of attack at the maximum CL/CD value
-        'CL_at_0': df.loc[df['alpha'].abs().idxmin(), 'CL'] if 0 in df['alpha'].values else None,   #Stores CL at 0 as the CL at the closest valid angle of attack to 0
+        'CL_at_0': df.loc[df['alpha'].abs().idxmin(), 'CL']                                         #Stores CL at 0 as the CL at the closest valid angle of attack to 0
     }
     return metrics                                                                                  #Returns all metrics
 
@@ -155,10 +156,6 @@ def clean_results(df):
     
     # Remove points where CL/CD is unrealistically high
     df = df[df['CL_CD'].abs() < 150]
-
-    # Remove statistical outliers in CD
-    median_cd = df['CD'].median()
-    df = df[df['CD'] > median_cd * 0.3]
     
     # Remove duplicate alpha values
     df = df.drop_duplicates(subset='alpha', keep='last')
@@ -179,57 +176,65 @@ def clean_results(df):
 dat_files = glob.glob('data/*.dat')
 dat_files = [f for f in dat_files if 'converted' not in f]
 
-reynolds = 200000
+# Make sure the raw output directory exists before XFOIL tries writing to it
+os.makedirs('results/raw', exist_ok=True)
+
+reynolds_values = [150000, 300000, 400000]  # 200k already done — don't regenerate
+
+# TESTING MODE: uncomment the next line to test on 4 airfoils before the full run
+# dat_files = sorted(dat_files)[:4]
+
 all_results = []
 all_metrics = []
 
 print(f"Found {len(dat_files)} airfoil files")
-print(f"Reynolds number: {reynolds:,}\n")
+print(f"Reynolds sweep: {reynolds_values}\n")
 
-for filepath in sorted(dat_files):
-    name = os.path.basename(filepath).replace('.dat', '')
-    print(f"Simulating {name}...")
-    
-    actual_filepath = detect_format(filepath)
-    
-    # Skip known problematic airfoils
-    if name in ['mh114', 'ag14', 'ag13']:
-        print(f"  Skipping {name} (known convergence issues)")
-        continue
+for reynolds in reynolds_values:
+    print(f"\n===== Re = {reynolds:,} =====\n")
+    for filepath in sorted(dat_files):
+        name = os.path.basename(filepath).replace('.dat', '')
 
-    df = run_xfoil(
-        airfoil_name=name,
-        airfoil_file=actual_filepath,
-        reynolds=reynolds,
-        alpha_start=-5,
-        alpha_end=15,
-        alpha_step=1
-    )
+        # Skip known problematic airfoils (before doing any conversion work)
+        if name in ['mh114', 'ag14', 'ag13']:
+            print(f"Skipping {name} (known convergence issues)")
+            continue
 
-    if df is not None:
-        df = clean_results(df)
+        print(f"Simulating {name}...")
+        actual_filepath = detect_format(filepath)
 
-    if df is not None:
-        all_results.append(df)
-        metrics = extract_metrics(df, name)
-        if metrics:
-            all_metrics.append(metrics)
-        print(f"  Done — {len(df)} points, max CL/CD = {df['CL_CD'].max():.1f}")
-    
-    time.sleep(0.3)
+        df = run_xfoil(
+            airfoil_name=name,
+            airfoil_file=actual_filepath,
+            reynolds=reynolds,
+            alpha_start=-5,
+            alpha_end=15,
+            alpha_step=1
+        )
+
+        if df is not None:
+            df = clean_results(df)
+            if df is not None:
+                all_results.append(df)
+                metrics = extract_metrics(df, name)
+                if metrics:
+                    all_metrics.append(metrics)
+                print(f"  Done — {len(df)} points, max CL/CD = {df['CL_CD'].max():.1f}")
+
+        time.sleep(0.3)
 
 if all_results:
     combined_df = pd.concat(all_results, ignore_index=True)
     metrics_df = pd.DataFrame(all_metrics)
-    
+
     os.makedirs('results', exist_ok=True)
-    combined_df.to_csv('results/simulation_results.csv', index=False)
-    metrics_df.to_csv('results/airfoil_metrics.csv', index=False)
-    
+    combined_df.to_csv('results/simulation_results_multiRe.csv', index=False)
+    metrics_df.to_csv('results/airfoil_metrics_multiRe.csv', index=False)
+
     print(f"\nAll simulations complete!")
-    print(f"Successful: {len(all_metrics)}/{len(dat_files)} airfoils")
+    print(f"Successful runs: {len(all_metrics)} (out of {len(dat_files) * len(reynolds_values)} attempted)")
     print(f"Total data points: {len(combined_df)}")
-    print(f"\nTop 10 by CL/CD:")
+    print(f"\nTop 10 by CL/CD across all Re:")
     print(metrics_df.sort_values('max_CL_CD', ascending=False).head(10).to_string(index=False))
 else:
     print("No results generated")
