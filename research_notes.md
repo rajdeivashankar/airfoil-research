@@ -273,3 +273,27 @@ Below 4%, the airfoil isn't generating enough lift to be efficient. Above 6%, th
 The high end (>15%) underperforms because thickness mainly adds skin friction and pressure drag without helping lift. The low end (<8%) underperforms for a different reason: very thin airfoils at low Reynolds numbers are prone to laminar separation bubbles and abrupt stall. At low Re the boundary layer is naturally thick and laminar, and a very thin airfoil doesn't have enough surface curvature to keep flow attached around the leading edge. The flow separates early, adding its own drag penalty and risking premature stall. So thin airfoils don't just fail to gain extra lift — they actively lose efficiency from separation. 12-15% is the sweet spot where neither the high-thickness drag problem nor the low-thickness separation problem dominates.
 
 **Follow-up reading:** laminar separation bubbles at low Reynolds numbers — connects directly to earlier boundary layer separation notes and should strengthen the discussion section of the paper.
+
+## July 22, 2026 - Divergence theory + single-point XFOIL function
+
+### Divergence concepts (Dowell prep)
+
+Static divergence model: wing section on torsional spring, lift at the AC, elastic axis a distance e behind it. Lift x e gives a nose-up moment, twist raises lift, spring resists. Three key results:
+
+- **EA position:** q_D = K_theta / (e c S CL_alpha), so divergence speed scales as 1/e. Moving the EA toward the AC shrinks the moment arm and weakens the feedback loop. At e = 0 the loop is severed (q_D -> infinity). EA ahead of the AC flips the sign and the feedback becomes self-correcting. This is why forward-swept wings (X-29) needed aeroelastic tailoring.
+- **Stiffness:** the aerodynamic moment grows with q but K_theta does not, so q_D is linear in K_theta. Stiffer wing = less twist per unit moment = higher divergence speed.
+- **At q_D:** solving the moment balance gives theta = (initial AoA term) / (K_theta - q e c S CL_alpha). The denominator is the effective stiffness. Below q_D it is positive and theta is finite. At exactly q_D it passes through zero - theta is singular, no equilibrium exists, and theta grows asymptotically as q approaches q_D from below. Above q_D the twist runs away until stall or structural failure. Framing that matters: q_D is an eigenvalue problem (at what q can the wing hold nonzero twist with zero input), and divergence is static, which distinguishes it from flutter.
+
+### analyze_airfoil() - xfoil_single.py
+
+Spring model needs one call per iteration: alpha in, (CL, CM) out. Single-point version of run_xfoil() - ALFA instead of ASEQ, NACA generator instead of coordinate files. Own file because run_xfoil_batch.py has no main guard, so importing from it would launch the full sweep. Returns (None, None) on timeout, missing file, or no valid data row, and rejects any row whose alpha does not match the request within 0.01 deg.
+
+### Verification
+
+- Sign convention confirmed: NACA 2412 at alpha = 0, Re 200k gives CM = -0.0608. Camber physically produces a nose-down moment, and XFOIL reports it as negative, so in XFOIL negative CM = nose-down and positive CM = nose-up (standard nose-up-positive convention). The divergence moment balance treats nose-up as the positive, destabilizing direction (nose-up twist raises alpha, which raises lift), so XFOIL's sign matches and CM feeds into the spring model directly with no sign flip. CL = 0.28 consistent with the 2412's ~-2 deg zero-lift angle.
+- Repeat calls give identical values (stale-file cleanup works).
+- Failure envelope: converges at 5 deg, returns (None, None) at 40 deg, but converges at 25 deg to plausible-looking post-stall numbers (CL = 0.69). Converged does not mean correct.
+
+### Implication for the spring model
+
+(None, None) alone is not a sufficient tripwire since XFOIL converges quietly in deep stall. The loop needs a validity cap (~14-15 deg effective alpha) and must record three outcomes separately: equilibrium below cap (below q_D), twist past cap (diverged), XFOIL failure (tool, not physics). q_D comes from the boundary between the first two, so keeping tool failures out of that bookkeeping protects the estimate.
