@@ -56,4 +56,7 @@ def analyze_airfoil(naca, reynolds, alpha):
     if last_row is None:
         return None, None                                   #File exists but no data row = XFOIL didn't converge
 
-    return last_row[1], last_row[4]  # CL=col1, CM=col4 — VERIFY CM sign convention before trusting spring model
+    if abs(last_row[0] - alpha) > 0.01:
+        return None, None                                   #Row in file isn't the alpha we requested
+
+    return last_row[1], last_row[4]  # CL=col1, CM=col4 — sign convention VERIFIED 2412@a0 gives CM=-0.06 (nose-up-positive to match Dowell)
