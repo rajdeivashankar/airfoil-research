@@ -297,3 +297,72 @@ Spring model needs one call per iteration: alpha in, (CL, CM) out. Single-point 
 ### Implication for the spring model
 
 (None, None) alone is not a sufficient tripwire since XFOIL converges quietly in deep stall. The loop needs a validity cap (~14-15 deg effective alpha) and must record three outcomes separately: equilibrium below cap (below q_D), twist past cap (diverged), XFOIL failure (tool, not physics). q_D comes from the boundary between the first two, so keeping tool failures out of that bookkeeping protects the estimate.
+
+## July 22, 2026 - divergence_model.py verification
+
+### Test configuration
+
+Baseline case unless noted otherwise:
+
+| Parameter | Value |
+|---|---|
+| Airfoil | NACA 2412 |
+| Re (fixed) | 200,000 |
+| alpha_0 | 2.0 deg |
+| K_theta | 45.0 N*m/rad |
+| e | 0.05 m |
+| c | 0.25 m |
+| span | 1.0 m (so S = 0.25 m^2) |
+| rho | 1.225 kg/m^3 |
+| tolerance | 0.001 deg |
+| max_iter | 50 |
+| alpha_cap | 14.0 deg |
+
+V = 11.8 m/s chosen so that Re = rho*V*c/mu matches the fixed Re = 200k input. The original test value of 15.0 m/s was inconsistent (Re ~254k) and was corrected before testing.
+
+### Test 1 - subcritical equilibrium (V = 11.8 m/s, q = 85.28 Pa)
+
+Result: status = converged, theta = 0.3271 deg, alpha_eff = 2.3271 deg, 5 iterations, CL = 0.547, CM = -0.0612.
+
+Hand-verified against the moment balance:
+- Lift-offset term: q*S*CL*e = 85.28 * 0.25 * 0.547 * 0.05 = +0.583 N*m
+- Camber moment term: q*S*c*CM = 85.28 * 0.25 * 0.25 * (-0.0612) = -0.326 N*m
+- Net: 0.257 N*m, divided by K_theta = 45 gives 0.005714 rad = 0.327 deg
+
+Matches the code output exactly. Note the two terms oppose each other: the camber's nose-down moment cancels roughly 56% of the lift's nose-up moment. CM_ac has a large effect on equilibrium twist while contributing nothing to q_D, which is the theoretical point demonstrated numerically.
+
+### Test 2 - divergence branch (V = 60 m/s, q = 2205 Pa)
+
+Result: status = diverged, theta = 34.27 deg, alpha_eff = 36.27 deg, 3 iterations, reason = alpha_eff exceeded validity cap.
+
+Exited via the alpha cap rather than max_iter, which is the clean divergence signal. Twist grew rather than contracting, as expected above q_D.
+
+### Test 3 - solver failure branch (V = 60 m/s, alpha_cap raised to 90 deg)
+
+Result: status = xfoil_failure, same theta and iteration count as Test 2, reason = analyze_airfoil returned None.
+
+Raising the cap let alpha_eff = 36.27 deg reach XFOIL, which failed to converge there. Confirms two things: the three-outcome bookkeeping distinguishes tool failure from physical divergence, and the validity cap does real protective work rather than duplicating the None check. Cap restored to 14 deg afterward.
+
+### Test 4 - convergence history
+
+theta_history_deg for the baseline case:
+[0.0, 0.2765, 0.3192, 0.3255, 0.3268, 0.3271]
+
+Successive step ratios (contraction factor G): 0.155, 0.146, 0.217, 0.200
+
+The first two ratios sit on the predicted G = q/q_D = 85.28/587 = 0.145. The later ratios drift upward because the increments (0.0014 deg and smaller) fall to the same scale as the 3-decimal alpha rounding passed to XFOIL and XFOIL's own output precision. Conclusion for the sweep: compute G from the first two or three ratios only.
+
+### q_D cross-check
+
+- Analytical, using q_D = K_theta / (e * S * CL_alpha) with CL_alpha ~ 6.1/rad: q_D ~ 587 Pa, V_D ~ 31 m/s
+- Empirical, from q/G at a single subcritical point: 550 to 584 Pa depending on which ratio is used
+
+Agreement within a few percent from one subcritical run, which validates the extrapolation method before any sweep has been done.
+
+### Open limitation - Reynolds consistency
+
+The fixed Re = 200k input corresponds physically to V = 11.8 m/s. At the predicted V_D of ~31 m/s the true Re is ~525k, a factor of 2.6 higher. Every test above is therefore internally consistent only at the low-velocity end. The fixed-Re simplification is defensible because q_D depends on CL_alpha, which is the least Re-sensitive quantity in this regime, but the gap at V_D is larger than originally assumed and needs to be addressed rather than just documented. Options: run the sweep at a Re representative of the near-divergence regime (~500k), or compute Re from V at each step. Decide before the production sweep.
+
+### Status
+
+All three return paths verified. Arithmetic verified by hand. Contraction factor matches theory. Function is ready for the velocity sweep.
