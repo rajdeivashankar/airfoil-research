@@ -91,5 +91,5 @@ def analyze_sweep(results):
 
 
 if __name__ == '__main__':
-    results = run_sweep(alpha_0=0.0)
+    results = run_sweep()
     summary = analyze_sweep(results)

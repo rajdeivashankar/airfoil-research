@@ -366,3 +366,37 @@ The fixed Re = 200k input corresponds physically to V = 11.8 m/s. At the predict
 ### Status
 
 All three return paths verified. Arithmetic verified by hand. Contraction factor matches theory. Function is ready for the velocity sweep.
+
+## July 25, 2026 - Velocity sweep and q_D determination
+
+### What was built
+
+divergence_sweep.py: sweeps V from 5 to 40 m/s (1 m/s steps), calling find_equilibrium_twist() at each point and recording V, q, Re, status, theta, and iteration count. Two q_D estimates come out of one sweep: the converged/diverged bracket, and the G-extrapolation from subcritical convergence rates. Failures are bucketed separately so they can never masquerade as divergence. max_iter raised to 300 so points just below q_D converge rather than getting mislabeled diverged. RE_MODE toggle switches between a fixed Re for the whole sweep and Re recomputed from V each step.
+
+### Primary result
+
+q_D ~= 580 Pa, V_D ~= 30.7 m/s for the baseline NACA 2412 section (alpha_0 = 2 deg, K_theta = 45 N*m/rad, e = 0.05 m, c = 0.25 m). Three independent methods agree within ~6%:
+
+- Analytical, q_D = K_theta / (e * S * CL_alpha) with CL_alpha ~ 6.1/rad: ~587 Pa
+- G-extrapolation, contraction factor -> 1 from the lowest converged points: ~576-586 Pa
+- Direct bracket, last converged (V=30, 551 Pa) to first diverged (V=31, 589 Pa)
+
+### Why G-extrapolation is the primary estimate, not the bracket
+
+The two methods read the wing at different angles of attack. The bracket forms at V=30-31 where equilibrium twist has grown to 12-14 deg (a_eff 13-14 deg), inside the region where CL_alpha is flattening toward stall - so the flip it detects blends true divergence with stall onset. The G-extrapolation reads convergence rates at V=5-10 where a_eff is 2.0-2.2 deg, deep in the linear-lift region where the divergence model's central assumption (constant CL_alpha) holds. G is literally the feedback loop gain q/q_D, so measuring it on clean subcritical points and extrapolating to G=1 recovers q_D without ever operating in the contaminated regime. The two estimates agreeing anyway means the stall contamination here is mild, and the small gap between them is roughly its size.
+
+### Reynolds independence (Dowell pre-empt)
+
+Fixed Re = 500k and Re-computed-from-V sweeps give the same bracket (551-589 Pa). This confirms empirically that holding Re fixed does not move q_D, which is expected because divergence depends on CL_alpha - the least Re-sensitive quantity in this regime. The fixed-Re run is the clean primary; the computed run is the consistency check that justifies the simplification with data instead of assertion.
+
+### Iteration count as a signature of the instability
+
+Iterations to converge climb from 3 at low speed toward ~28 approaching q_D. This is a direct picture of the contraction factor G = q/q_D weakening as q -> q_D: the fixed-point iteration diverges for the same reason the wing does. The clean monotonic climb holds over V=5-28; past there a_eff exceeds 10 deg and the flattening CL_alpha alters the effective loop gain, so the tail is stall-influenced and not read as pure G-weakening.
+
+### alpha_0 = 0 case - limitation, not a result
+
+Running the sweep at alpha_0 = 0 drove equilibrium twist negative (camber's nose-down moment dominates the near-zero lift-offset moment) and produced many XFOIL failures with erratic surviving points. It does not give a clean second q_D. Theory says q_D should be alpha_0-independent (alpha_0 is a numerator term, absent from the effective-stiffness denominator), and Run 1's internal consistency supports that - but the alpha_0 = 0 sweep is too numerically ill-behaved to confirm it directly. Documented as a numerical limitation of the single-point approach. Do NOT claim it confirmed alpha_0-independence.
+
+### Figure
+
+Two stacked panels sharing the V axis: equilibrium twist vs V (top) and iterations vs V (bottom), with q_D marked at 30.7 m/s. Converged points as a line, failures as hollow gray markers (excluded), diverged points as red crosses (no stable equilibrium, magnitudes not meaningful).
