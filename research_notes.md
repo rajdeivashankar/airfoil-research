@@ -400,3 +400,30 @@ Running the sweep at alpha_0 = 0 drove equilibrium twist negative (camber's nose
 ### Figure
 
 Two stacked panels sharing the V axis: equilibrium twist vs V (top) and iterations vs V (bottom), with q_D marked at 30.7 m/s. Converged points as a line, failures as hollow gray markers (excluded), diverged points as red crosses (no stable equilibrium, magnitudes not meaningful).
+
+## July 26, 2026 - Multi-Re training data assembly
+
+### Why
+
+The CL/CD ML model was overfitting at a single Reynolds number: test R2 = 0.821 but cross-validation R2 = 0.376. The gap means the single test split was a lucky fold - the model was memorizing the 67 individual airfoils rather than learning the geometry-performance relationship. (max_CL was fine at R2 = 0.908; CL/CD is the hardest target since it's a ratio that amplifies errors in both terms.) The intended fix is more data plus Reynolds as a feature, so the model is forced to generalize and can learn performance as a function of geometry AND flow regime.
+
+### What was built
+
+build_training_data.py assembles one training table, one row per (airfoil, Re), geometry broadcast across each airfoil's Re rows:
+
+1. 200k metrics aggregated fresh from the raw polars in simulation_results.csv, using the same clean_results + extract_metrics logic as the sweep - NOT the stale 200k copy embedded in the geometry CSV, so all four Re go through identical cleaning.
+2. Concatenated with the 150k/300k/400k sweep metrics.
+3. Point-count filter (>= 10 valid polar points) applied per run before the merge. Fails loudly if n_points is absent rather than silently skipping - added n_points = len(df) to extract_metrics for this.
+4. Merged with GEOMETRY-ONLY columns. The geometry CSV (geometry_performance.csv) carries stale 200k performance columns that collided with the metrics columns (_x/_y suffixes) on the first attempt; selecting only airfoil + the 8 geometry columns before merging fixes it.
+5. Sanity check confirms geometry is constant across each airfoil's Re rows.
+
+### Result
+
+240 training rows, 17 columns (airfoil + reynolds + 6 metrics + 8 geometry + n_points). Per-Re counts: 200k=67, 150k=64, 300k=63, 400k=63 (mild low-end attrition from convergence, as expected). Point filter dropped 2 sparse runs (one each at 300k/400k). 49 of 67 airfoils have all four Re. Geometry-constant check passed for all.
+
+Honest scope note: this is 67 airfoils under up to 4 conditions, not 240 independent airfoils. It helps overfitting (more rows constrain memorization; Re becomes learnable signal) but is not a 3.5x increase in geometric variety. If CL/CD CV stays mediocre after this, the real fix is more airfoils, not more conditions.
+
+### Follow-ups
+
+- 9 airfoils (ag04, ag08, ag09, ag10, ag12, e176, fx66s196, s1091, sd7032) have simulation data but no geometry row, so the inner merge drops them. The ag0x cluster suggests extract_geometry.py is failing on that family (likely a coordinate-format issue). Recovering them adds geometric variety - worth doing before leaning hard on CL/CD.
+- ml_model.py changes still to make: add reynolds to features, switch to GroupKFold grouped by airfoil (so all of an airfoil's Re rows stay on one side of each split - otherwise the same airfoil leaks across train/test and CV comes out falsely high, the same effect that inflated the original 0.821).
