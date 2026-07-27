@@ -137,6 +137,7 @@ def extract_metrics(df, airfoil_name):
     metrics = {
         'airfoil': airfoil_name,                                                                    #Stores the airfoil name
         'reynolds': df['reynolds'].iloc[0],                                                         #Tags each metrics row with its Reynolds number
+        'n_points': len(df),                                                                        #Number of valid polar points, for the training-data filter
         'max_CL': df['CL'].max(),                                                                   #Stores the maximum CL value
         'stall_angle': df.loc[max_cl_idx, 'alpha'],                                                 #Finds and stores the stall angle from the maximum CL value
         'min_CD': df['CD'].min(),                                                                   #Stores the minimum CD value
