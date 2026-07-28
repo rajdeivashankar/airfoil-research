@@ -427,3 +427,30 @@ Honest scope note: this is 67 airfoils under up to 4 conditions, not 240 indepen
 
 - 9 airfoils (ag04, ag08, ag09, ag10, ag12, e176, fx66s196, s1091, sd7032) have simulation data but no geometry row, so the inner merge drops them. The ag0x cluster suggests extract_geometry.py is failing on that family (likely a coordinate-format issue). Recovering them adds geometric variety - worth doing before leaning hard on CL/CD.
 - ml_model.py changes still to make: add reynolds to features, switch to GroupKFold grouped by airfoil (so all of an airfoil's Re rows stay on one side of each split - otherwise the same airfoil leaks across train/test and CV comes out falsely high, the same effect that inflated the original 0.821).
+
+## July 27, 2026 - Multi-Re ML: overfitting fixed
+
+### The fix
+
+Two changes to ml_model.py turned the overfitting CL/CD model around: added reynolds as a feature (so the extra rows carry signal instead of contradicting each other), and switched cross-validation to GroupKFold grouped by airfoil (so an airfoil's four Re rows never split across train and test, which is what inflated the old single-Re test score). Also moved StandardScaler into a Pipeline so it refits inside each fold, and replaced the leaky random train/test split with an airfoil-grouped GroupShuffleSplit so the reported test score is trustworthy too.
+
+### Result
+
+CL/CD grouped-CV R2 went from 0.376 to 0.862 (Gradient Boosting), corroborated by 0.873 on the airfoil-grouped hold-out. Test and CV now agree closely for every target - the signature that the leak is gone and both numbers measure real generalization (the old model was 0.821 test vs 0.376 CV, a chasm).
+
+- CL/CD: Gradient Boosting best, 0.862 CV / 0.873 test
+- max_CL: Linear Regression best, 0.944 CV / 0.909 test - close to linear in geometry + Re, a clean interpretable finding; tree models sit lower (~0.87-0.90), slightly below the old leaky 0.908, which is the honest cost of leak-free evaluation
+- min_CD: tree models ~0.895 CV, test and CV in agreement
+
+### The sleeper result
+
+reynolds came in as the 2nd-most-important feature for CL/CD (0.371), just behind camber_area (0.420) and above every geometry feature. This both justifies the multi-Re work (added the second-most-important variable, not just more rows) and explains why the single-Re model overfit - it was blind to a predictor nearly as important as the top geometric one. Tight causal story: overfit because Reynolds was missing; fixed by adding it and evaluating honestly.
+
+### Reporting note
+
+Only the grouped scores (CV and grouped hold-out) go in the writeup. The old random-split numbers do not appear anywhere - they were inflated by airfoil leakage. Plot titles corrected from "Re=200,000" to the full 150k-400k range.
+
+### Still open (not blocking)
+
+- 9 airfoils (ag0x cluster + a few) dropped by the geometry merge; recovering them adds geometric variety and would firm up CL/CD further
+- n_points in extract_metrics and the CL_at_0 fix remain as housekeeping
