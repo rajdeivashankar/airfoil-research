@@ -3,19 +3,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import cross_val_score, GroupKFold, GroupShuffleSplit
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score, mean_absolute_error
 import os
 
-df = pd.read_csv('results/geometry_performance.csv')
+df = pd.read_csv('results/training_data_multiRe.csv')
 os.makedirs('results/figures', exist_ok=True)
 
 print(f"Dataset: {len(df)} airfoils\n")
 
 # ── Features and targets ───────────────────────────────────────────────────
 features = ['max_camber', 'max_camber_loc', 'max_thickness',
-            'max_thickness_loc', 'le_thickness', 'camber_at_25', 'camber_area']
+            'max_thickness_loc', 'le_thickness', 'camber_at_25', 'camber_area',
+            'reynolds']
 
 targets = {
     'max_CL_CD': 'Maximum CL/CD',
@@ -24,6 +26,15 @@ targets = {
 }
 
 X = df[features].values
+groups = df['airfoil'].values          # keeps an airfoil's Re rows on one side of each split
+gkf = GroupKFold(n_splits=5)
+
+# One held-out split for the reported test score, grouped so no airfoil
+# appears in both train and test (the plain random split leaked airfoils
+# across Re rows and inflated the test R²)
+gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+train_idx, test_idx = next(gss.split(X, groups=groups))
+
 print(f"Features: {features}")
 print(f"Samples: {len(X)}\n")
 
@@ -32,14 +43,10 @@ results = {}
 
 for target_col, target_name in targets.items():
     y = df[target_col].values
-    
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42)
-    
-    scaler = StandardScaler()
-    X_train_sc = scaler.fit_transform(X_train)
-    X_test_sc = scaler.transform(X_test)
-    
+
+    X_train, X_test = X[train_idx], X[test_idx]
+    y_train, y_test = y[train_idx], y[test_idx]
+
     models = {
         'Linear Regression': LinearRegression(),
         'Random Forest':     RandomForestRegressor(n_estimators=100, random_state=42),
@@ -53,26 +60,27 @@ for target_col, target_name in targets.items():
     best_r2 = -999
     
     for model_name, model in models.items():
+        # Linear Regression needs scaling; wrap it so the scaler refits
+        # inside each CV fold (no test-fold leakage) and reynolds is scaled
+        # in-matrix alongside the geometry features
         if model_name == 'Linear Regression':
-            model.fit(X_train_sc, y_train)
-            y_pred = model.predict(X_test_sc)
+            estimator = Pipeline([('scaler', StandardScaler()), ('lr', model)])
         else:
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
-        
+            estimator = model
+
+        estimator.fit(X_train, y_train)
+        y_pred = estimator.predict(X_test)
+
         r2 = r2_score(y_test, y_pred)
         mae = mean_absolute_error(y_test, y_pred)
-        
-        # Cross validation
-        if model_name == 'Linear Regression':
-            cv_scores = cross_val_score(model, 
-                scaler.fit_transform(X), y, cv=5, scoring='r2')
-        else:
-            cv_scores = cross_val_score(model, X, y, cv=5, scoring='r2')
-        
+
+        # Grouped cross-validation: an airfoil is never in train and test at once
+        cv_scores = cross_val_score(estimator, X, y, cv=gkf,
+                                    groups=groups, scoring='r2')
+
         print(f"  {model_name}:")
         print(f"    Test R²={r2:.3f}  MAE={mae:.3f}  CV R²={cv_scores.mean():.3f}±{cv_scores.std():.3f}")
-        
+
         if r2 > best_r2:
             best_r2 = r2
             best_model = (model_name, model, y_pred, y_test)
@@ -101,7 +109,7 @@ colors = ['steelblue' if i < 3 else 'lightsteelblue'
           for i in range(len(importance_df))]
 ax.barh(importance_df['feature'], importance_df['importance'],
         color=colors, edgecolor='white')
-ax.set_title('Feature Importance for CL/CD Prediction\n(Random Forest, Re=200,000)',
+ax.set_title('Feature Importance for CL/CD Prediction\n(Random Forest, Re = 150k–400k)',
              fontsize=13, fontweight='bold')
 ax.set_xlabel('Importance Score')
 ax.grid(True, alpha=0.3, axis='x')
@@ -132,7 +140,7 @@ for ax, (target_col, target_name) in zip(axes, targets.items()):
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
 
-plt.suptitle('ML Model Predictions vs Actual Values',
+plt.suptitle('ML Model Predictions vs Actual Values (Re = 150k–400k, airfoil-grouped CV)',
              fontsize=13, fontweight='bold')
 plt.tight_layout()
 plt.savefig('results/figures/ml_predictions.png', dpi=150)
