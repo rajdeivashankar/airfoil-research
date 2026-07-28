@@ -454,3 +454,38 @@ Only the grouped scores (CV and grouped hold-out) go in the writeup. The old ran
 
 - 9 airfoils (ag0x cluster + a few) dropped by the geometry merge; recovering them adds geometric variety and would firm up CL/CD further
 - n_points in extract_metrics and the CL_at_0 fix remain as housekeeping
+
+## July 28, 2026 - Robustness analysis across the Reynolds envelope
+
+### The idea
+
+The multi-Re data enables a question single-Re screening can't answer: is an airfoil robust across the flow envelope, or a specialist tuned to one Re? Physically this is about how the geometry manages the laminar separation bubble as Re changes - a robust airfoil (thicker, moderate camber, gentle gradients) holds performance across Re; a specialist (thin, aggressive camber) peaks hard at one Re and falls off. For a UAV that sweeps through Re during a mission (loiter to cruise, and root-to-tip on a tapered wing), consistent good performance across the envelope can beat a high peak at one condition.
+
+### Metric choices
+
+- Robustness = coefficient of variation (std/mean) of CL/CD across the 4 Re, NOT raw range. Range punishes high-performing airfoils for having big numbers; CV measures relative consistency, so flat-and-excellent and flat-and-mediocre both read as robust, which is what "robust" should mean.
+- Paired with min CL/CD (worst-case across Re) as a separate axis - CV alone ignores level, and worst-case is what sets a UAV's endurance margin. The two axes together make a 2D map.
+- Computed ONLY on airfoils with genuine 4-Re coverage (50 of 67). A CV over 3 points is not comparable to one over 4; strict gating keeps the axis meaning one thing.
+
+### Result
+
+Peak CL/CD vs CV correlation: r = 0.531. This is the headline - a positive correlation across all 50 airfoils saying higher-peak airfoils tend to swing more across Re. That single number is the peak-vs-consistency tradeoff, and because it's a correlation not a drawn boundary, it survives the "why is that the cutoff" question.
+
+- Robust extreme (lowest-quartile CV AND highest-quartile worst-case): fx60126, goe225 - thick, moderate-camber sections, mean CL/CD ~85-93, CV ~0.12, worst-case in the 70s. Only two airfoils are both flat and high, which is what a real tradeoff implies.
+- Specialist extreme (highest CV): e399, e398, goe227 - peaks of 116-119 but swing hard across Re. Their worst-case (60-72) is no better than the robust group's - they buy a higher ceiling they rarely sit at and pay for it in consistency. (mh78 also shows high CV but is simply poor everywhere, not a true specialist - an outlier, not part of the high-peak story.)
+
+Note the robust and specialist groups overlap heavily in worst-case CL/CD - the specialists' advantage is entirely in peak, not floor. That's the design argument in one sentence: for a wing that spends real time across Re, the specialist's peak is a number you rarely hit and its floor is no safer.
+
+Framing note: quadrant membership by median split was rejected - splitting each axis at its own median manufactures four roughly-equal groups by construction, so it's an artifact not a finding. The map is presented as a continuous tradeoff (the correlation) with named extremes (quartile intersections), and the median lines are visual reference only.
+
+### Partial-coverage airfoils - three buckets, not two
+
+The convergence-vs-filter distinction (first spotted tracing E216) had to be enforced carefully: "missing from the training table" conflates genuine convergence failure with runs that converged but were dropped by the point filter. Convergence is measured pre-cleaning and identically for all four Re (150k/300k/400k by counting raw polar rows, 200k from simulation_results.csv since it has no raw .txt files).
+
+- EDGE (genuine low-Re convergence failure, monotonic): ag03, e174, e214, fx76mp140, sd7084. All fail at 150k - the physically coherent fragility signal, since low Re is where separation dominates. Tentative, caveated for XFOIL-reliability confound, flagged for higher-fidelity follow-up. This is the honest fragility set.
+- INTERIOR (mid-envelope hole, flanked by convergence): e216, mh32, s2048. A failure at 300k with success on both sides is physically incoherent as fragility - almost certainly a numerical convergence quirk. Explicitly NOT counted as fragility. E216 is the ground-truth test case (converged 150/200/400, failed 300) and lands here correctly.
+- CONVERGED-BUT-FILTERED (converged at all 4 Re, a run dropped by the point filter): e387, e392, fx63137, mh43, naca2408, naca2410, s1223, sd7003, sd7037. A data-completeness exclusion, NOT fragility - these solved fine. sd7037 is the tell: it was being mislabeled as fragile when its data was just filtered for sparseness.
+
+### Caveat for the writeup
+
+"Robust" here is relative to this 50-airfoil set (quartile-based), not an absolute standard. And E216 - the single-Re headline airfoil - is not in the robustness map because it lacks clean 4-Re coverage (300k convergence failure); its 200k result stands, but the robustness story features different airfoils, which is worth stating plainly.
