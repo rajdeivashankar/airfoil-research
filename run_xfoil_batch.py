@@ -152,8 +152,12 @@ def clean_results(df):
     if df is None:
         return None
     
-    # Remove points where CD is unrealistically small
-    df = df[df['CD'] > 0.008]
+    # Remove points where CD is non-physically small. The floor scales with
+    # Reynolds number: real minimum drag drops as Re rises, so a fixed 200k-tuned
+    # floor (0.008) wrongly deletes legitimately low drag at 300k/400k.
+    reynolds = df['reynolds'].iloc[0]
+    cd_floor = 0.008 * (200000 / reynolds) ** 0.2
+    df = df[df['CD'] > cd_floor]
     
     # Remove points where CL/CD is unrealistically high
     df = df[df['CL_CD'].abs() < 150]
