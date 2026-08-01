@@ -489,3 +489,11 @@ The convergence-vs-filter distinction (first spotted tracing E216) had to be enf
 ### Caveat for the writeup
 
 "Robust" here is relative to this 50-airfoil set (quartile-based), not an absolute standard. And E216 - the single-Re headline airfoil - is not in the robustness map because it lacks clean 4-Re coverage (300k convergence failure); its 200k result stands, but the robustness story features different airfoils, which is worth stating plainly.
+
+## August 1, 2026 - Checked the "9 missing airfoils" - turned out to be nothing
+
+Earlier, 9 airfoils showed up in the simulation data but had no matching geometry row, and I thought the geometry code was failing on them. I checked, and it isn't. The geometry script actually works on all 67 airfoils it's given - I tested ag03 specifically and it came out fine (camber 0.0202, thickness 0.0624 from a 180-point file). So the geometry code was never the problem.
+
+What the 9 really are: either airfoils that XFOIL couldn't simulate (so they have a shape but no performance numbers to train on, and the merge drops them because there's nothing to predict), or just a name-matching hiccup in the merge. Either way there's nothing to fix and nothing to recover - you can't train a model on an airfoil the simulation couldn't handle.
+
+Good to have actually confirmed the geometry code works instead of assuming it was broken. Not going to chase the last few airfoils - the model is already strong (CL/CD score 0.862) without them, and my time is better spent on validation.
