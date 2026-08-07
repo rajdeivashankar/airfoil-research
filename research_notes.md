@@ -497,3 +497,27 @@ Earlier, 9 airfoils showed up in the simulation data but had no matching geometr
 What the 9 really are: either airfoils that XFOIL couldn't simulate (so they have a shape but no performance numbers to train on, and the merge drops them because there's nothing to predict), or just a name-matching hiccup in the merge. Either way there's nothing to fix and nothing to recover - you can't train a model on an airfoil the simulation couldn't handle.
 
 Good to have actually confirmed the geometry code works instead of assuming it was broken. Not going to chase the last few airfoils - the model is already strong (CL/CD score 0.862) without them, and my time is better spent on validation.
+
+## August 6, 2026 - Downloaded E387 experimental data for validation
+
+### Goal
+
+Set up expermental validation of the XFOIL pipeline against real wind-tunnel data. E387 is the natural choice: it's the UIUC program's own reference/validation airfoil (they cross-check their tunnel against NASA Langley LTPT using it), it's in my dataset, and it's the most-studied low-Re airfoil in the field.
+
+### What I found
+
+E387 experimental data lives in UIUC LSAT Volume 1, not Volume 2 (downloaded Vol 2 first by mistake - it doesn't contain E387). Files are plain ASCII, downloadable from m-selig.ae.illinois.edu/pd/pub/lsat/volume01/ (DRAG01.TXT, LIFT01.TXT, FORMAT01.TXT), saved to data/experimental/.
+
+The good surprise: E387 has FIVE Reynolds numbers in the file - 61k, 101k, 151.6k, 202.3k, 303k - so THREE of them directly match my simulations (151600->150k, 202300->200k, 303000->300k), not the two I expected. 150k moves from "argue by extension" to a direct experimental comparison. Only 400k stays an extrapolation, since the data tops out at 303k (400k is above the experimental range, not between points - state it that way).
+
+### Format
+
+Each Reynolds number is its own sub-block with a header (airfoil, builder, number of Re's, average Re, number of angles of attack) then a table: alpha / Cl / Cd / then 5 spanwise Cd columns. Use columns 1-3 (alpha, Cl, Cd); the spanwise columns are the individual momentum-method stations that get averaged. All three match-blocks have 11 alpha points, ~-5 to +10 deg (pre-stall through early stall - exactly where XFOIL should be trustworthy).
+
+### Note for the writeup
+
+Experimental Re values are 151600 / 202300 / 303000, not exactly 150k/200k/300k. The ~1% offset doesn't affect CL/CD comparison, but label figures with the actual experimental Re rather than rounding, and acknowledge the small mismatch once.
+
+### Next
+
+Parse the three E387 blocks from DRAG01.TXT, pull my XFOIL E387 polars at 150k/200k/300k, overlay (CL vs alpha, and drag polar CD vs CL), then quantify error - checking whether it's largest near stall and at the lowest Re, as the physical story predicts.
